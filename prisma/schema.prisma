@@ -1,0 +1,187 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  firstName String
+  lastName  String
+  avatar    String?
+  bio       String?
+  phone     String?
+  location  String?
+  website   String?
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Auth
+  password     String
+  refreshToken String?
+  emailToken   String?
+  resetToken   String?
+  resetExpires DateTime?
+
+  // Relations
+  hostedEvents Event[]  @relation("EventHost")
+  attendances  RSVP[]
+  likes        Like[]
+  follows      Follow[] @relation("Follower")
+  followers    Follow[] @relation("Following")
+  reviews      Review[]
+
+  @@map("users")
+}
+
+model Event {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  startDate   DateTime
+  endDate     DateTime?
+  timezone    String   @default("UTC")
+  location    String
+  address     String?
+  latitude    Float?
+  longitude   Float?
+  category    Category
+  subcategory String?
+  
+  // Ticket info
+  maxAttendees    Int?
+  currentAttendees Int     @default(0)
+  price           Decimal @default(0)
+  currency        String  @default("USD")
+  ticketTypes     Json?   // Flexible ticket pricing
+  
+  // Media
+  coverImage String?
+  images     String[]
+  
+  // Settings
+  isPublic     Boolean @default(true)
+  requiresApproval Boolean @default(false)
+  allowWaitlist    Boolean @default(true)
+  
+  // Metadata
+  tags       String[]
+  featured   Boolean  @default(false)
+  canceled   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  publishedAt DateTime?
+
+  // Relations
+  hostId   String
+  host     User   @relation("EventHost", fields: [hostId], references: [id], onDelete: Cascade)
+  rsvps    RSVP[]
+  likes    Like[]
+  reviews  Review[]
+
+  @@map("events")
+}
+
+model RSVP {
+  id       String     @id @default(uuid())
+  status   RSVPStatus @default(GOING)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  // Payment info
+  paymentId     String?
+  paymentStatus PaymentStatus @default(PENDING)
+  amountPaid    Decimal       @default(0)
+  ticketType    String?
+  
+  // Relations
+  userId  String
+  eventId String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@map("rsvps")
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  // Relations
+  userId  String
+  eventId String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@map("likes")
+}
+
+model Follow {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  // Relations
+  followerId  String
+  followingId String
+  follower    User   @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User   @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("follows")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  rating    Int      // 1-5 stars
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  userId  String
+  eventId String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@map("reviews")
+}
+
+enum Category {
+  TECHNOLOGY
+  BUSINESS
+  DESIGN
+  SOCIAL
+  NETWORKING
+  EDUCATION
+  HEALTH
+  SPORTS
+  MUSIC
+  ART
+  FOOD
+  TRAVEL
+  OTHER
+}
+
+enum RSVPStatus {
+  GOING
+  MAYBE
+  NOT_GOING
+  WAITLIST
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
